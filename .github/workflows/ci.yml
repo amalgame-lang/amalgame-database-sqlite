@@ -1,0 +1,53 @@
+name: CI
+
+# Gated on manual dispatch until amc v0.5.0 ships (this package's
+# `required-amalgame` minimum). Flip these triggers back on
+# push/pull_request once the matrix has a real tag to download.
+on:
+  workflow_dispatch:
+  # push:
+  #   branches: [main]
+  #   tags: ['v*']
+  # pull_request:
+  #   branches: [main]
+
+jobs:
+  test:
+    name: Test against amc ${{ matrix.amc-tag }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Pin to the latest amc release that satisfies this
+        # package's `required-amalgame = ">=0.5.0"` constraint.
+        # Add more tags here as new amc releases ship — older
+        # ones are kept as a regression net.
+        amc-tag: [v0.5.0]
+    steps:
+      - name: Checkout package
+        uses: actions/checkout@v4
+
+      - name: Install system deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y libgc-dev libcurl4-openssl-dev
+
+      - name: Download amc ${{ matrix.amc-tag }}
+        run: |
+          set -e
+          # GitHub Releases bundles amc + runtime/ in a tar.gz per
+          # platform — see amalgame-lang/Amalgame release.yml.
+          TAG="${{ matrix.amc-tag }}"
+          VERSION="${TAG#v}"
+          curl -sSL -o amc.tar.gz \
+            "https://github.com/amalgame-lang/Amalgame/releases/download/${TAG}/amc-${VERSION}-linux-x86_64.tar.gz"
+          mkdir -p $RUNNER_TEMP/amc-install
+          tar -xzf amc.tar.gz -C $RUNNER_TEMP/amc-install
+          echo "AMC=$RUNNER_TEMP/amc-install/amc" >> $GITHUB_ENV
+          echo "AMC_RUNTIME=$RUNNER_TEMP/amc-install/runtime" >> $GITHUB_ENV
+
+      - name: Verify amc
+        run: $AMC --version
+
+      - name: Run tests
+        run: ./tests/run_tests.sh "$AMC"
