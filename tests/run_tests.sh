@@ -88,27 +88,39 @@ echo "  amc:     $AMC ($("$AMC" --version 2>&1))"
 echo "  package: $PKG_ROOT"
 echo ""
 
-# ── Install self via amc add (uses cwd as user project) ─
-# We test the package's user-facing install flow by `amc add`-ing
-# the package from its local Git working tree. CI fetches via tag.
-PKG_GIT_URL="github.com/amalgame-lang/amalgame-database-sqlite"
-PKG_TAG="${PKG_TAG:-v0.2.0}"
+# ── Stage a fake cache pointing at the local working tree ──
+# Without this, the test .am file's `import Amalgame.Database.SQLite`
+# fails because amc has no way to know about the package. The real
+# install flow (`amc package add`) needs a published tag, which
+# this CI doesn't have until release time (the tag-push workflow
+# runs in parallel with this one).
+#
+# Trick: build a cache-dir layout that matches what amc would
+# produce, symlink the cache entry to the local working tree,
+# then point amc at it via $AMALGAME_PACKAGES_DIR + a manual
+# amalgame.lock in the project dir.
+FAKE_CACHE="$BUILD_DIR/cache"
+PKG_GIT="github.com/amalgame-lang/amalgame-database-sqlite"
+PKG_TAG="${PKG_TAG:-v0.2.1}"
+FAKE_SHA="deadbeefcafebabe0000000000000000000000ab"
+SHORT_SHA="${FAKE_SHA:0:8}"
+PKG_CACHE_DIR="$FAKE_CACHE/$PKG_GIT/${PKG_TAG}_${SHORT_SHA}"
 
-echo "── Resolving $PKG_GIT_URL@$PKG_TAG ──"
-if (cd "$PROJ_DIR" && "$AMC" add "$PKG_GIT_URL@$PKG_TAG") > "$BUILD_DIR/install.log" 2>&1; then
-    echo "  installed"
-    PKG_CACHE_DIR=$(grep "^Cached at" "$BUILD_DIR/install.log" | awk '{print $3}')
-    PKG_SQLITE_C="$PKG_CACHE_DIR/runtime/Amalgame_Database/sqlite/sqlite3.c"
-    if [ -z "$PKG_CACHE_DIR" ] || [ ! -f "$PKG_SQLITE_C" ]; then
-        echo "  WARNING: cache path missing — falling back to local working tree"
-        PKG_SQLITE_C="$SQLITE_C"
-    fi
-else
-    echo "  WARNING: amc add failed (likely offline / no network)"
-    echo "  falling back to the local working tree for sqlite3.c"
-    cat "$BUILD_DIR/install.log" | head -5 | sed 's/^/    /'
-    PKG_SQLITE_C="$SQLITE_C"
-fi
+mkdir -p "$(dirname "$PKG_CACHE_DIR")"
+rm -rf "$PKG_CACHE_DIR"
+ln -s "$PKG_ROOT" "$PKG_CACHE_DIR"
+
+cat > "$PROJ_DIR/amalgame.lock" <<EOF
+[[package]]
+name = "amalgame-database-sqlite"
+git  = "$PKG_GIT"
+tag  = "$PKG_TAG"
+rev  = "$FAKE_SHA"
+EOF
+
+export AMALGAME_PACKAGES_DIR="$FAKE_CACHE"
+PKG_SQLITE_C="$SQLITE_C"
+echo "  cache:   $FAKE_CACHE → $PKG_ROOT"
 echo ""
 
 # ── Pre-compile sqlite3.c once ─────────────────────────
