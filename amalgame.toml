@@ -5,11 +5,12 @@
 
 [package]
 name              = "amalgame-database-sqlite"
-version           = "0.2.0"
+version           = "0.2.1"
 license           = "Apache-2.0"
 description       = "SQLite 3 binding for Amalgame — vendored amalgamation, manifest-driven dispatch."
 authors           = ["Bastien Mouget"]
-required-amalgame = ">=0.5.0"
+required-amalgame = ">=0.5.4"
+schema-version    = 1
 
 [stdlib]
 class     = "SQLite"
@@ -19,9 +20,21 @@ namespace = "Amalgame.Database.SQLite"
 # Vendored .c sources that user binaries link alongside the
 # generated .c. The package manager builds them once per cache
 # directory and reuses the resulting .o on every compile.
-# Parser support for this field lands in PR 4b — for v0.1.0 the
-# main-repo test runner compiles `sqlite3.c` manually.
-sources = ["runtime/Amalgame_Database/sqlite/sqlite3.c"]
+sources    = ["runtime/Amalgame_Database/sqlite/sqlite3.c"]
+
+# Precompile at install time (amc >= 0.5.4): the gcc pass runs
+# once during `amc package add sqlite@vX.Y.Z`, output cached at
+# `~/.amalgame/packages/.../build/<platform>/SQLite-sqlite3.c.o`.
+# Subsequent `amc test` / `amc build` reuse the .o instantly.
+# Override with `amc package add sqlite@vX.Y.Z --no-precompile`.
+precompile = true
+
+# Per-source compile flags. SQLite's amalgamation has internal
+# warnings we don't want to surface (amc adds -w under the hood
+# already, but explicit defaults travel better when a downstream
+# picks the flags up manually). FTS5 is enabled for parity with
+# the v0.2.0 build expectations.
+cflags     = "-DSQLITE_THREADSAFE=1 -DSQLITE_ENABLE_FTS5"
 
 # Surface the amc cgen needs to know about. `returns` is the
 # C-level type (with `*` for pointer types); amc strips the `*`

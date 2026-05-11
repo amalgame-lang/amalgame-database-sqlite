@@ -8,10 +8,22 @@ own public-domain dedication.
 ## Install
 
 ```bash
-amc add github.com/amalgame-lang/amalgame-database-sqlite@v0.1.0
+amc package add github.com/amalgame-lang/amalgame-database-sqlite@v0.2.1
+# or via the curated index:
+amc package add sqlite@v0.2.1
 ```
 
-Requires **amc 0.5.0+** (the package-manager release).
+Requires **amc 0.5.4+** for precompile-on-install (v0.2.1+). Older
+amc back to 0.5.0 still works — it ignores `precompile = true` and
+falls back to the v0.5.2 lazy `/tmp` cache, paying the compile cost
+on each fresh `amc test` instead of once at install.
+
+Since v0.2.1 the package opts into **precompile-on-install** (amc
+0.5.4+): the gcc pass on the SQLite amalgamation runs once during
+`amc package add`, the resulting `.o` lives at
+`~/.amalgame/packages/.../build/<platform>/SQLite-sqlite3.c.o`, and
+every subsequent `amc test` / `amc build` reuses it instantly. Skip
+it with `--no-precompile` for install-without-build batches.
 
 ## Surface
 
