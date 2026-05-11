@@ -5,7 +5,7 @@
 
 [package]
 name              = "amalgame-database-sqlite"
-version           = "0.2.1"
+version           = "0.2.2"
 license           = "Apache-2.0"
 description       = "SQLite 3 binding for Amalgame — vendored amalgamation, manifest-driven dispatch."
 authors           = ["Bastien Mouget"]
