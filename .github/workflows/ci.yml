@@ -15,11 +15,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Pin to the latest amc release that satisfies this
-        # package's `required-amalgame = ">=0.5.0"` constraint.
-        # Add more tags here as new amc releases ship — older
-        # ones are kept as a regression net.
-        amc-tag: [v0.5.0]
+        # v0.5.4 introduced `[stdlib].precompile = true` which v0.2.1
+        # opts into. Older amc still installs (ignores the field) and
+        # falls back to the v0.5.2 lazy /tmp cache for the .o.
+        amc-tag: [v0.5.5, v0.5.4, v0.5.0]
     steps:
       - name: Checkout package
         uses: actions/checkout@v4
