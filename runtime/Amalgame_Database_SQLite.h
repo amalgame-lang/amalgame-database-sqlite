@@ -28,7 +28,7 @@
  * compile time; the amalgamation is built with SQLITE_THREADSAFE=1
  * by default, which is what we want for the typical service-loop
  * caller. No mutex on our side — the AmalgameSQLite struct is single-
- * owner and immutable past SQLite_Open.
+ * owner and immutable past Amalgame_Database_SQLite_Open.
  */
 
 #ifndef AMALGAME_DATABASE_SQLITE_H
@@ -57,7 +57,7 @@ static inline code_string Amalgame_SQLite_strdup_err(const char* msg) {
  * opens a transient in-memory database (great for tests). Returns
  * a non-NULL `AmalgameSQLite*` even on failure — call `Db.IsOpen()`
  * to check, or `Db.LastError()` for the message. */
-static inline AmalgameSQLite* SQLite_Open(code_string path) {
+static inline AmalgameSQLite* Amalgame_Database_SQLite_Open(code_string path) {
     AmalgameSQLite* db = (AmalgameSQLite*) code_alloc(sizeof(AmalgameSQLite));
     db->handle     = NULL;
     db->last_error = NULL;
@@ -76,21 +76,21 @@ static inline AmalgameSQLite* SQLite_Open(code_string path) {
 /* Close the underlying SQLite handle. Idempotent — calling twice
  * (or on a never-opened handle) is a no-op. The wrapper struct
  * itself is GC-managed; we don't free it here. */
-static inline void SQLite_Close(AmalgameSQLite* db) {
+static inline void Amalgame_Database_SQLite_Close(AmalgameSQLite* db) {
     if (db && db->handle) {
         sqlite3_close(db->handle);
         db->handle = NULL;
     }
 }
 
-static inline code_bool SQLite_IsOpen(AmalgameSQLite* db) {
+static inline code_bool Amalgame_Database_SQLite_IsOpen(AmalgameSQLite* db) {
     return (db && db->handle) ? 1 : 0;
 }
 
 /* Snapshot of the most recent error message (open failure,
  * malformed SQL, constraint violation, etc.). Empty string if
  * no error has been recorded. */
-static inline code_string SQLite_LastError(AmalgameSQLite* db) {
+static inline code_string Amalgame_Database_SQLite_LastError(AmalgameSQLite* db) {
     if (!db) return "";
     if (db->last_error) return db->last_error;
     if (db->handle) {
@@ -109,7 +109,7 @@ static inline code_string SQLite_LastError(AmalgameSQLite* db) {
  * any error (check `Db.LastError()`). Multiple statements
  * separated by `;` are accepted in one call — sqlite3_exec
  * loops over them internally. */
-static inline code_bool SQLite_Exec(AmalgameSQLite* db, code_string sql) {
+static inline code_bool Amalgame_Database_SQLite_Exec(AmalgameSQLite* db, code_string sql) {
     if (!db || !db->handle) return 0;
     char* errmsg = NULL;
     int rc = sqlite3_exec(db->handle, sql ? sql : "", NULL, NULL, &errmsg);
@@ -132,7 +132,7 @@ static inline code_bool SQLite_Exec(AmalgameSQLite* db, code_string sql) {
  * columns become empty strings. Returns an empty list on prepare/
  * step error; check `Db.LastError()` to distinguish a real empty
  * result from a failure. */
-static inline AmalgameList* SQLite_QueryAll(AmalgameSQLite* db, code_string sql) {
+static inline AmalgameList* Amalgame_Database_SQLite_QueryAll(AmalgameSQLite* db, code_string sql) {
     AmalgameList* rows = AmalgameList_new();
     if (!db || !db->handle) return rows;
     sqlite3_stmt* stmt = NULL;
@@ -166,7 +166,7 @@ static inline AmalgameList* SQLite_QueryAll(AmalgameSQLite* db, code_string sql)
  * Useful for AUTO_INCREMENT-style retrieval (`SELECT last_insert_rowid()`
  * without the round-trip). Returns 0 if there hasn't been an
  * insert yet on this handle. */
-static inline i64 SQLite_LastInsertId(AmalgameSQLite* db) {
+static inline i64 Amalgame_Database_SQLite_LastInsertId(AmalgameSQLite* db) {
     if (!db || !db->handle) return 0;
     return (i64) sqlite3_last_insert_rowid(db->handle);
 }
@@ -175,7 +175,7 @@ static inline i64 SQLite_LastInsertId(AmalgameSQLite* db) {
  * DELETE on this connection. Same caveats as SQLite's
  * sqlite3_changes — only counts the immediate statement, not
  * cascades inside triggers. */
-static inline i64 SQLite_Changes(AmalgameSQLite* db) {
+static inline i64 Amalgame_Database_SQLite_Changes(AmalgameSQLite* db) {
     if (!db || !db->handle) return 0;
     return (i64) sqlite3_changes(db->handle);
 }

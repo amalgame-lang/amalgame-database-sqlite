@@ -92,7 +92,7 @@ echo ""
 # We test the package's user-facing install flow by `amc add`-ing
 # the package from its local Git working tree. CI fetches via tag.
 PKG_GIT_URL="github.com/amalgame-lang/amalgame-database-sqlite"
-PKG_TAG="${PKG_TAG:-v0.1.0}"
+PKG_TAG="${PKG_TAG:-v0.2.0}"
 
 echo "── Resolving $PKG_GIT_URL@$PKG_TAG ──"
 if (cd "$PROJ_DIR" && "$AMC" add "$PKG_GIT_URL@$PKG_TAG") > "$BUILD_DIR/install.log" 2>&1; then
