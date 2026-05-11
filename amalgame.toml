@@ -1,0 +1,40 @@
+# Package manifest — amc reads this at `amc add` time to learn
+# what symbols this package contributes + how to compile against
+# them. See docs/proposals/amalgame-package-manager.md in
+# amalgame-lang/Amalgame for the full spec.
+
+[package]
+name              = "amalgame-database-sqlite"
+version           = "0.1.0"
+license           = "Apache-2.0"
+description       = "SQLite 3 binding for Amalgame — vendored amalgamation, manifest-driven dispatch."
+authors           = ["Bastien Mouget"]
+required-amalgame = ">=0.5.0"
+
+[stdlib]
+class     = "SQLite"
+header    = "runtime/Amalgame_Database_SQLite.h"
+namespace = "Amalgame.Database.SQLite"
+
+# Vendored .c sources that user binaries link alongside the
+# generated .c. The package manager builds them once per cache
+# directory and reuses the resulting .o on every compile.
+# Parser support for this field lands in PR 4b — for v0.1.0 the
+# main-repo test runner compiles `sqlite3.c` manually.
+sources = ["runtime/Amalgame_Database/sqlite/sqlite3.c"]
+
+# Surface the amc cgen needs to know about. `returns` is the
+# C-level type (with `*` for pointer types); amc strips the `*`
+# when declaring the symbol's Amalgame-side type to the resolver.
+[stdlib.functions]
+Open          = { returns = "AmalgameSQLite*" }
+Close         = { returns = "void" }
+IsOpen        = { returns = "code_bool" }
+LastError     = { returns = "code_string" }
+Exec          = { returns = "code_bool" }
+QueryAll      = { returns = "AmalgameList*" }
+LastInsertId  = { returns = "i64" }
+Changes       = { returns = "i64" }
+
+[dependencies]
+# none — SQLite is a leaf in the dep graph
