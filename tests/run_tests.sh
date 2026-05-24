@@ -153,7 +153,7 @@ run_test() {
         FAIL=$((FAIL + 1)); return
     fi
     gcc -O2 -I"$AMC_RUNTIME" -I"$PKG_RUNTIME" "$out_base.c" "$SQLITE_OBJ" \
-        -lgc -lm -lcurl -ldl -lpthread -o "$out_base" 2>/dev/null
+        -lgc -lm -ldl -lpthread -o "$out_base" 2>/dev/null
     if [ ! -x "$out_base" ]; then
         echo -e "${RED}FAIL${NC} (gcc link failed)"
         FAIL=$((FAIL + 1)); return

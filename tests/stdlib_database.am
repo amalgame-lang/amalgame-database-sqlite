@@ -63,10 +63,9 @@ public class Program {
 
         // ── Query: SELECT *, count rows ────────────────────
 
-        // Outer list has no type annotation because the Amalgame
-        // parser rejects nested generics in let bindings
-        // (`List<List<string>>`). Inner list is annotated explicitly
-        // so the cgen can resolve `.Get(int)` to the typed result.
+        // v0.3.0+: `returns_generic = "List<List<string>>"` in the
+        // manifest lets amc infer the full chain. No annotations
+        // needed on `rows`, `alice_row`, `alice_name`, etc.
         let rows = SQLite.QueryAll(db, "SELECT id, name, age FROM users ORDER BY id")
         let rowCount: int = rows.Count()
         if (rowCount == 3) {
@@ -77,15 +76,15 @@ public class Program {
 
         // ── Query: column values as text ───────────────────
 
-        let alice_row: List<string> = rows.Get(0)
-        let alice_name: string = alice_row.Get(1)
+        let alice_row = rows.Get(0)
+        let alice_name = alice_row.Get(1)
         if (alice_name == "Alice") {
             Console.WriteLine("[PASS] alice name")
         } else {
             Console.WriteLine("[FAIL] alice name got " + alice_name)
         }
 
-        let alice_age: string = alice_row.Get(2)
+        let alice_age = alice_row.Get(2)
         if (alice_age == "31") {
             Console.WriteLine("[PASS] alice age post-update")
         } else {
@@ -97,8 +96,8 @@ public class Program {
         // Post-update ages: Alice=31, Bob=26, Charlie=40. Both
         // Alice and Charlie are > 30, so the count is 2.
         let countRows = SQLite.QueryAll(db, "SELECT COUNT(*) FROM users WHERE age > 30")
-        let countRow: List<string> = countRows.Get(0)
-        let countStr: string = countRow.Get(0)
+        let countRow = countRows.Get(0)
+        let countStr = countRow.Get(0)
         if (countStr == "2") {
             Console.WriteLine("[PASS] aggregate count 2")
         } else {
@@ -123,8 +122,8 @@ public class Program {
 
         SQLite.Exec(db, "DELETE FROM users WHERE name = 'Bob'")
         let afterDelete = SQLite.QueryAll(db, "SELECT COUNT(*) FROM users")
-        let afterRow: List<string> = afterDelete.Get(0)
-        let leftStr: string = afterRow.Get(0)
+        let afterRow = afterDelete.Get(0)
+        let leftStr = afterRow.Get(0)
         if (leftStr == "2") {
             Console.WriteLine("[PASS] delete leaves 2")
         } else {
