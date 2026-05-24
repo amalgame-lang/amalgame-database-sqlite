@@ -5,11 +5,11 @@
 
 [package]
 name              = "amalgame-database-sqlite"
-version           = "0.2.2"
+version           = "0.3.0"
 license           = "Apache-2.0"
-description       = "SQLite 3 binding for Amalgame — vendored amalgamation, manifest-driven dispatch."
+description       = "SQLite 3 binding for Amalgame — vendored amalgamation, manifest-driven dispatch. QueryAll returns typed List<List<string>>."
 authors           = ["Bastien Mouget"]
-required-amalgame = ">=0.5.4"
+required-amalgame = ">=0.8.40"
 schema-version    = 1
 
 [stdlib]
@@ -45,7 +45,10 @@ Close         = { returns = "void" }
 IsOpen        = { returns = "code_bool" }
 LastError     = { returns = "code_string" }
 Exec          = { returns = "code_bool" }
-QueryAll      = { returns = "AmalgameList*" }
+# `returns_generic` (amc 0.8.40+) lets `let row = rows.Get(i)`
+# infer to `List<string>` and `row.Get(j)` to `string` without
+# explicit annotations on the consumer side.
+QueryAll      = { returns = "AmalgameList*", returns_generic = "List<List<string>>" }
 LastInsertId  = { returns = "i64" }
 Changes       = { returns = "i64" }
 
