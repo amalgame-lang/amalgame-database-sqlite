@@ -8,15 +8,17 @@ own public-domain dedication.
 ## Install
 
 ```bash
-amc package add github.com/amalgame-lang/amalgame-database-sqlite@v0.2.1
+amc package add github.com/amalgame-lang/amalgame-database-sqlite@v0.3.0
 # or via the curated index:
-amc package add sqlite@v0.2.1
+amc package add sqlite@v0.3.0
 ```
 
-Requires **amc 0.5.4+** for precompile-on-install (v0.2.1+). Older
-amc back to 0.5.0 still works — it ignores `precompile = true` and
-falls back to the v0.5.2 lazy `/tmp` cache, paying the compile cost
-on each fresh `amc test` instead of once at install.
+Requires **amc 0.8.40+** for `returns_generic = "List<List<string>>"`
+on `QueryAll` — that's what lets consumers chain `rows.Get(i).Get(j)`
+to a typed `string` cell without any explicit annotations.
+Precompile-on-install (added in v0.2.1, amc 0.5.4) keeps the SQLite
+amalgamation built once per cache directory and reused on every
+subsequent `amc test` / `amc build`.
 
 Since v0.2.1 the package opts into **precompile-on-install** (amc
 0.5.4+): the gcc pass on the SQLite amalgamation runs once during
