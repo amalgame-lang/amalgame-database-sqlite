@@ -180,4 +180,141 @@ static inline i64 Amalgame_Database_SQLite_Changes(AmalgameSQLite* db) {
     return (i64) sqlite3_changes(db->handle);
 }
 
+/* ────────────────────────────────────────────────────────────────
+ * v2 surface — parameter binding + transactions.
+ *
+ * Parameter binding uses positional `?` placeholders (1-indexed in
+ * SQLite, 0-indexed on the Amalgame side). Every binding goes
+ * through `sqlite3_bind_text` (with SQLITE_TRANSIENT so the C side
+ * snapshots the bytes before we return to AM); NULL list entries
+ * bind as SQL NULL. SQLite's flexible type affinity converts the
+ * text to INTEGER / REAL / NUMERIC per the destination column's
+ * declared type, so the same `List<string>` shape works for SELECTs
+ * with WHERE on a numeric column, INSERTs into mixed-type rows, etc.
+ * A type-safe variant accepting `SqlParam` discriminated values
+ * (and exposing bytes / typed-column accessors) is the v3 ask.
+ *
+ * Transactions wrap `BEGIN`, `COMMIT`, `ROLLBACK` through the
+ * existing Exec path so the same `db.LastError()` surfaces any
+ * failure (e.g. nested transactions return "cannot start a
+ * transaction within a transaction").
+ * ──────────────────────────────────────────────────────────────── */
+
+/* Shared binding step: prepare + bind every param then return the
+ * stmt to the caller for stepping. Returns NULL on prepare or bind
+ * failure (db->last_error already populated). */
+static inline sqlite3_stmt* Amalgame_SQLite_prepare_bound(
+    AmalgameSQLite* db, code_string sql, AmalgameList* params)
+{
+    sqlite3_stmt* stmt = NULL;
+    int rc = sqlite3_prepare_v2(db->handle, sql ? sql : "", -1, &stmt, NULL);
+    if (rc != SQLITE_OK) {
+        db->last_error = Amalgame_SQLite_strdup_err(sqlite3_errmsg(db->handle));
+        if (stmt) sqlite3_finalize(stmt);
+        return NULL;
+    }
+    int n = params ? (int) AmalgameList_size(params) : 0;
+    int wanted = sqlite3_bind_parameter_count(stmt);
+    if (n != wanted) {
+        /* Surface arity mismatches explicitly — SQLite would
+         * otherwise bind partial params and return surprising
+         * SQL semantics (NULL fills the rest, leading to
+         * silently wrong queries). */
+        char buf[128];
+        snprintf(buf, sizeof(buf),
+            "param count mismatch: got %d, sql expects %d", n, wanted);
+        db->last_error = Amalgame_SQLite_strdup_err(buf);
+        sqlite3_finalize(stmt);
+        return NULL;
+    }
+    for (int i = 0; i < n; i++) {
+        code_string v = (code_string) AmalgameList_get(params, i);
+        int br;
+        if (v) {
+            br = sqlite3_bind_text(stmt, i + 1, v, -1, SQLITE_TRANSIENT);
+        } else {
+            br = sqlite3_bind_null(stmt, i + 1);
+        }
+        if (br != SQLITE_OK) {
+            db->last_error = Amalgame_SQLite_strdup_err(sqlite3_errmsg(db->handle));
+            sqlite3_finalize(stmt);
+            return NULL;
+        }
+    }
+    return stmt;
+}
+
+/* Run a no-result SQL statement with `?` placeholders bound from
+ * `params`. Same return semantics as `Exec`. Use for parameterised
+ * INSERT / UPDATE / DELETE — defends against SQL injection without
+ * the caller having to escape inputs by hand. */
+static inline code_bool Amalgame_Database_SQLite_ExecBind(
+    AmalgameSQLite* db, code_string sql, AmalgameList* params)
+{
+    if (!db || !db->handle) return 0;
+    sqlite3_stmt* stmt = Amalgame_SQLite_prepare_bound(db, sql, params);
+    if (!stmt) return 0;
+    int rc = sqlite3_step(stmt);
+    if (rc != SQLITE_DONE && rc != SQLITE_ROW) {
+        db->last_error = Amalgame_SQLite_strdup_err(sqlite3_errmsg(db->handle));
+        sqlite3_finalize(stmt);
+        return 0;
+    }
+    sqlite3_finalize(stmt);
+    return 1;
+}
+
+/* Run a SELECT (or any row-returning statement) with `?` placeholders
+ * bound from `params`. Same `List<List<string>>` shape as `QueryAll`
+ * — NULL columns become empty strings, every value goes through
+ * sqlite3_column_text. Returns an empty list on error; check
+ * `db.LastError()` to distinguish failure from a real empty result. */
+static inline AmalgameList* Amalgame_Database_SQLite_QueryBindAll(
+    AmalgameSQLite* db, code_string sql, AmalgameList* params)
+{
+    AmalgameList* rows = AmalgameList_new();
+    if (!db || !db->handle) return rows;
+    sqlite3_stmt* stmt = Amalgame_SQLite_prepare_bound(db, sql, params);
+    if (!stmt) return rows;
+    int ncols = sqlite3_column_count(stmt);
+    int rc;
+    while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
+        AmalgameList* row = AmalgameList_new();
+        for (int i = 0; i < ncols; i++) {
+            const unsigned char* t = sqlite3_column_text(stmt, i);
+            const char* s = t ? (const char*) t : "";
+            size_t n = strlen(s);
+            char* copy = (char*) code_alloc(n + 1);
+            memcpy(copy, s, n + 1);
+            AmalgameList_add(row, (void*) copy);
+        }
+        AmalgameList_add(rows, (void*) row);
+    }
+    if (rc != SQLITE_DONE) {
+        db->last_error = Amalgame_SQLite_strdup_err(sqlite3_errmsg(db->handle));
+    }
+    sqlite3_finalize(stmt);
+    return rows;
+}
+
+/* Begin a transaction. Returns true on success, false if a
+ * transaction is already active (SQLite refuses nested BEGIN).
+ * Pairs with Commit / Rollback. */
+static inline code_bool Amalgame_Database_SQLite_Begin(AmalgameSQLite* db) {
+    return Amalgame_Database_SQLite_Exec(db, "BEGIN");
+}
+
+/* Commit the current transaction. Returns true on success; false
+ * (with db.LastError populated) if no transaction is active or
+ * the commit hits a constraint that survived to flush time. */
+static inline code_bool Amalgame_Database_SQLite_Commit(AmalgameSQLite* db) {
+    return Amalgame_Database_SQLite_Exec(db, "COMMIT");
+}
+
+/* Roll back the current transaction. Returns true on success;
+ * false (with LastError populated) if no transaction is active. */
+static inline code_bool Amalgame_Database_SQLite_Rollback(AmalgameSQLite* db) {
+    return Amalgame_Database_SQLite_Exec(db, "ROLLBACK");
+}
+
 #endif /* AMALGAME_DATABASE_SQLITE_H */

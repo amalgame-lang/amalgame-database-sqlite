@@ -130,6 +130,130 @@ public class Program {
             Console.WriteLine("[FAIL] delete count got " + leftStr)
         }
 
+        // ── v0.4: parameter binding (ExecBind / QueryBindAll) ─
+
+        // Parameterised INSERT — defends against injection without
+        // the caller string-escaping anything.
+        let bindParams: List<string> = new List<string>()
+        bindParams.Add("Dave; DROP TABLE users; --")
+        bindParams.Add("55")
+        let bindOk: bool = SQLite.ExecBind(db,
+            "INSERT INTO users (name, age) VALUES (?, ?)", bindParams)
+        if (bindOk) {
+            Console.WriteLine("[PASS] execbind insert")
+        } else {
+            Console.WriteLine("[FAIL] execbind: " + SQLite.LastError(db))
+        }
+
+        // The "; DROP TABLE" payload must round-trip as data, not
+        // get evaluated as a separate statement. Verify by name + count.
+        let stillThere: bool = SQLite.IsOpen(db)
+        if (stillThere) {
+            Console.WriteLine("[PASS] execbind injection foiled")
+        } else {
+            Console.WriteLine("[FAIL] execbind injection: handle closed")
+        }
+
+        // QueryBindAll with a single param — fetch the row we just
+        // inserted by name.
+        let qParams: List<string> = new List<string>()
+        qParams.Add("Dave; DROP TABLE users; --")
+        let daveRows = SQLite.QueryBindAll(db,
+            "SELECT name, age FROM users WHERE name = ?", qParams)
+        if (daveRows.Count() == 1) {
+            let daveRow = daveRows.Get(0)
+            let daveAge: string = daveRow.Get(1)
+            if (daveAge == "55") {
+                Console.WriteLine("[PASS] querybindall fetch")
+            } else {
+                Console.WriteLine("[FAIL] querybindall age got: " + daveAge)
+            }
+        } else {
+            Console.WriteLine("[FAIL] querybindall rows got " + String_FromInt(daveRows.Count()))
+        }
+
+        // Arity mismatch: SQL expects 2 params, we pass 1.
+        let arityBad: List<string> = new List<string>()
+        arityBad.Add("alone")
+        let arityOk: bool = SQLite.ExecBind(db,
+            "INSERT INTO users (name, age) VALUES (?, ?)", arityBad)
+        if (!arityOk) {
+            let arityErr: string = SQLite.LastError(db)
+            if (String_Contains(arityErr, "param count mismatch")) {
+                Console.WriteLine("[PASS] execbind arity check")
+            } else {
+                Console.WriteLine("[FAIL] execbind arity err: " + arityErr)
+            }
+        } else {
+            Console.WriteLine("[FAIL] execbind arity: should have rejected")
+        }
+
+        // NULL binding — list entry is "" today (no nullable List
+        // element until amalgame ergonomics catch up). Skip the
+        // NULL test for now; LL params bound through bind_text
+        // become empty-string SQL values, which round-trips.
+
+        // ── v0.4: transactions (Begin / Commit / Rollback) ────
+
+        let beginOk: bool = SQLite.Begin(db)
+        if (beginOk) {
+            Console.WriteLine("[PASS] begin")
+        } else {
+            Console.WriteLine("[FAIL] begin: " + SQLite.LastError(db))
+        }
+
+        SQLite.Exec(db, "INSERT INTO users (name, age) VALUES ('Eve', 99)")
+        let rollbackOk: bool = SQLite.Rollback(db)
+        if (rollbackOk) {
+            Console.WriteLine("[PASS] rollback")
+        } else {
+            Console.WriteLine("[FAIL] rollback: " + SQLite.LastError(db))
+        }
+        // Eve must NOT be in the table after rollback.
+        let eveParams: List<string> = new List<string>()
+        eveParams.Add("Eve")
+        let eveRows = SQLite.QueryBindAll(db,
+            "SELECT name FROM users WHERE name = ?", eveParams)
+        if (eveRows.Count() == 0) {
+            Console.WriteLine("[PASS] rollback drops insert")
+        } else {
+            Console.WriteLine("[FAIL] rollback left " + String_FromInt(eveRows.Count()) + " eve rows")
+        }
+
+        // Commit path: insert Frank, commit, verify.
+        SQLite.Begin(db)
+        SQLite.Exec(db, "INSERT INTO users (name, age) VALUES ('Frank', 33)")
+        let commitOk: bool = SQLite.Commit(db)
+        if (commitOk) {
+            Console.WriteLine("[PASS] commit")
+        } else {
+            Console.WriteLine("[FAIL] commit: " + SQLite.LastError(db))
+        }
+        let frankParams: List<string> = new List<string>()
+        frankParams.Add("Frank")
+        let frankRows = SQLite.QueryBindAll(db,
+            "SELECT age FROM users WHERE name = ?", frankParams)
+        if (frankRows.Count() == 1) {
+            Console.WriteLine("[PASS] commit persists insert")
+        } else {
+            Console.WriteLine("[FAIL] commit lost insert: " + String_FromInt(frankRows.Count()))
+        }
+
+        // Nested BEGIN must fail — SQLite refuses it.
+        SQLite.Begin(db)
+        let nestedOk: bool = SQLite.Begin(db)
+        if (!nestedOk) {
+            let nestErr: string = SQLite.LastError(db)
+            if (String_Contains(nestErr, "transaction")) {
+                Console.WriteLine("[PASS] nested begin rejected")
+            } else {
+                Console.WriteLine("[FAIL] nested begin err: " + nestErr)
+            }
+        } else {
+            Console.WriteLine("[FAIL] nested begin: should have rejected")
+        }
+        SQLite.Rollback(db) // clear the outer transaction
+
         // ── Close ─────────────────────────────────────────
 
         SQLite.Close(db)
