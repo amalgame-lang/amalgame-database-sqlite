@@ -55,7 +55,7 @@ class Program {
 }
 ```
 
-### v0.1.0 method surface
+### Method surface
 
 | Method | Returns | Notes |
 |---|---|---|
@@ -67,12 +67,54 @@ class Program {
 | `SQLite.QueryAll(db, sql)` | `List<List<string>>` | All columns as text |
 | `SQLite.LastInsertId(db)` | `int` | Rowid of last `INSERT` |
 | `SQLite.Changes(db)` | `int` | Rows affected by last `INSERT`/`UPDATE`/`DELETE` |
+| `SQLite.ExecBind(db, sql, params)` | `bool` | `?` placeholders bound from `List<string>` (v0.4+) |
+| `SQLite.QueryBindAll(db, sql, params)` | `List<List<string>>` | Parameterised SELECT (v0.4+) |
+| `SQLite.Begin(db)` | `bool` | Start transaction (v0.4+) |
+| `SQLite.Commit(db)` | `bool` | Commit transaction (v0.4+) |
+| `SQLite.Rollback(db)` | `bool` | Roll back transaction (v0.4+) |
 
-## Deferred to v2
+### Parameter binding (v0.4+)
 
-Parameter binding via `?` placeholders, typed column accessors
-(`row.AsInt(0)` / `row.AsBytes(2)`), prepared-statement reuse,
-explicit transactions (`db.Begin` / `Commit` / `Rollback`).
+```amalgame
+let params: List<string> = new List<string>()
+params.Add("Dave")
+params.Add("55")
+SQLite.ExecBind(db, "INSERT INTO users (name, age) VALUES (?, ?)", params)
+
+let q: List<string> = new List<string>()
+q.Add("Dave")
+let rows = SQLite.QueryBindAll(db, "SELECT age FROM users WHERE name = ?", q)
+```
+
+Parameters bind positionally (1-indexed in SQL, 0-indexed in the
+list). Every value goes through `sqlite3_bind_text` with
+`SQLITE_TRANSIENT` so the C side snapshots the bytes. SQLite's
+flexible type affinity converts to INTEGER / REAL / NUMERIC per
+the destination column's declared type. Arity mismatches surface
+as `"param count mismatch: got X, sql expects Y"` in `LastError`.
+
+### Transactions (v0.4+)
+
+```amalgame
+SQLite.Begin(db)
+SQLite.Exec(db, "INSERT INTO users (name, age) VALUES ('Alice', 30)")
+if (everythingOk) {
+    SQLite.Commit(db)
+} else {
+    SQLite.Rollback(db)
+}
+```
+
+Each call is a thin wrapper around `BEGIN` / `COMMIT` / `ROLLBACK`.
+Errors surface through `LastError` (e.g. nested `BEGIN` returns
+`"cannot start a transaction within a transaction"`).
+
+## Deferred to v3
+
+Typed column accessors (`row.AsInt(0)` / `row.AsBytes(2)`),
+prepared-statement reuse for hot-loop scenarios, type-safe
+discriminated-union parameter binding (vs the v0.4 `List<string>`
+shape), BLOB / `?N` named placeholders, `WAL` mode helpers.
 
 ## Building
 

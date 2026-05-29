@@ -185,6 +185,19 @@ run_test "update reflected"             "[PASS] alice age post-update"
 run_test "aggregate count"              "[PASS] aggregate count 2"
 run_test "error reported"               "[PASS] error reported"
 run_test "delete + verify"              "[PASS] delete leaves 2"
+
+# ── v0.4: parameter binding + transactions ──
+run_test "execbind insert"              "[PASS] execbind insert"
+run_test "execbind injection foiled"    "[PASS] execbind injection foiled"
+run_test "querybindall fetch"           "[PASS] querybindall fetch"
+run_test "execbind arity check"         "[PASS] execbind arity check"
+run_test "begin"                        "[PASS] begin"
+run_test "rollback"                     "[PASS] rollback"
+run_test "rollback drops insert"        "[PASS] rollback drops insert"
+run_test "commit"                       "[PASS] commit"
+run_test "commit persists insert"       "[PASS] commit persists insert"
+run_test "nested begin rejected"        "[PASS] nested begin rejected"
+
 run_test "close"                        "[PASS] closed"
 
 # ── Summary ────────────────────────────────────────────
