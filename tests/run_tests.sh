@@ -184,6 +184,8 @@ run_test "column text"                  "[PASS] alice name"
 run_test "update reflected"             "[PASS] alice age post-update"
 run_test "aggregate count"              "[PASS] aggregate count 2"
 run_test "error reported"               "[PASS] error reported"
+run_test "last error cleared after success" "[PASS] last error cleared by a successful call"
+run_test "last error empty on success"     "[PASS] last error empty on success"
 run_test "delete + verify"              "[PASS] delete leaves 2"
 
 # ── v0.4: parameter binding + transactions ──

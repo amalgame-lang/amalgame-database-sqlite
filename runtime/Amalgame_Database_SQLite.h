@@ -92,15 +92,12 @@ static inline code_bool Amalgame_Database_SQLite_IsOpen(AmalgameSQLite* db) {
  * no error has been recorded. */
 static inline code_string Amalgame_Database_SQLite_LastError(AmalgameSQLite* db) {
     if (!db) return "";
+    /* Every operation clears last_error first and sets it on failure,
+     * so it describes the LAST operation only — empty on success, as
+     * documented. (Falling back to sqlite3_errmsg here returned
+     * "not an error" after a success, and a stale message stuck to
+     * every later successful call.) */
     if (db->last_error) return db->last_error;
-    if (db->handle) {
-        const char* msg = sqlite3_errmsg(db->handle);
-        if (!msg) return "";
-        /* Copy out of the SQLite-owned storage so the caller can
-         * hold onto the pointer past the next sqlite3 call.
-         * Also sheds the `const` qualifier cleanly. */
-        return Amalgame_SQLite_strdup_err(msg);
-    }
     return "";
 }
 
@@ -111,6 +108,7 @@ static inline code_string Amalgame_Database_SQLite_LastError(AmalgameSQLite* db)
  * loops over them internally. */
 static inline code_bool Amalgame_Database_SQLite_Exec(AmalgameSQLite* db, code_string sql) {
     if (!db || !db->handle) return 0;
+    db->last_error = NULL;
     char* errmsg = NULL;
     int rc = sqlite3_exec(db->handle, sql ? sql : "", NULL, NULL, &errmsg);
     if (rc != SQLITE_OK) {
@@ -135,6 +133,7 @@ static inline code_bool Amalgame_Database_SQLite_Exec(AmalgameSQLite* db, code_s
 static inline AmalgameList* Amalgame_Database_SQLite_QueryAll(AmalgameSQLite* db, code_string sql) {
     AmalgameList* rows = AmalgameList_new();
     if (!db || !db->handle) return rows;
+    db->last_error = NULL;
     sqlite3_stmt* stmt = NULL;
     int rc = sqlite3_prepare_v2(db->handle, sql ? sql : "", -1, &stmt, NULL);
     if (rc != SQLITE_OK) {
@@ -252,6 +251,7 @@ static inline code_bool Amalgame_Database_SQLite_ExecBind(
     AmalgameSQLite* db, code_string sql, AmalgameList* params)
 {
     if (!db || !db->handle) return 0;
+    db->last_error = NULL;
     sqlite3_stmt* stmt = Amalgame_SQLite_prepare_bound(db, sql, params);
     if (!stmt) return 0;
     int rc = sqlite3_step(stmt);
@@ -274,6 +274,7 @@ static inline AmalgameList* Amalgame_Database_SQLite_QueryBindAll(
 {
     AmalgameList* rows = AmalgameList_new();
     if (!db || !db->handle) return rows;
+    db->last_error = NULL;
     sqlite3_stmt* stmt = Amalgame_SQLite_prepare_bound(db, sql, params);
     if (!stmt) return rows;
     int ncols = sqlite3_column_count(stmt);

@@ -118,6 +118,27 @@ public class Program {
             Console.WriteLine("[FAIL] error should have flagged")
         }
 
+        // ── LastError describes the LAST operation only ────
+        // (before v0.4.1 the error above stuck to every later successful
+        // call, and a fresh connection answered "not an error")
+
+        let okAfterErr = SQLite.QueryAll(db, "SELECT upper('abc')")
+        let errAfterOk: string = SQLite.LastError(db)
+        if (String_Length(errAfterOk) == 0 && okAfterErr.Count() == 1) {
+            Console.WriteLine("[PASS] last error cleared by a successful call")
+        } else {
+            Console.WriteLine("[FAIL] last error after success: " + errAfterOk)
+        }
+        let fresh = SQLite.Open(":memory:")
+        SQLite.QueryAll(fresh, "SELECT 1")
+        let freshErr: string = SQLite.LastError(fresh)
+        if (String_Length(freshErr) == 0) {
+            Console.WriteLine("[PASS] last error empty on success")
+        } else {
+            Console.WriteLine("[FAIL] last error on success: " + freshErr)
+        }
+        SQLite.Close(fresh)
+
         // ── DELETE + verify ────────────────────────────────
 
         SQLite.Exec(db, "DELETE FROM users WHERE name = 'Bob'")
