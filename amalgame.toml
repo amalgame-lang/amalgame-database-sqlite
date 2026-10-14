@@ -5,9 +5,9 @@
 
 [package]
 name              = "amalgame-database-sqlite"
-version           = "0.4.0"
+version           = "0.4.1"
 license           = "Apache-2.0"
-description       = "SQLite 3 binding for Amalgame — vendored amalgamation. v0.4 adds parameter binding (ExecBind / QueryBindAll) and transactions (Begin / Commit / Rollback)."
+description       = "SQLite 3 binding for Amalgame — vendored amalgamation. v0.4 adds parameter binding (ExecBind / QueryBindAll) and transactions (Begin / Commit / Rollback). v0.4.1: LastError describes the last operation only (empty on success)."
 authors           = ["Bastien Mouget"]
 required-amalgame = ">=0.8.40"
 schema-version    = 1
